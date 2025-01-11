@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>中国象棋</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="game-container">
+        <div class="chessboard">
+            <div class="board-grid"></div>
+            <div class="river"></div>
+            <div id="pieces"></div>
+        </div>
+        <div class="game-info">
+            <button id="startButton" class="start-button">开始游戏</button>
+            <div class="game-status">
+                <h3>游戏状态</h3>
+                <p id="currentPlayer">等待开始...</p>
+                <p id="gameMessage"></p>
+                <button id="undoButton" class="undo-button" disabled>后退一步</button>
+            </div>
+        </div>
+    </div>
+    <script src="script.js"></script>
+    <!-- <script src="ai.js"></script> -->
+    <script src="audio.js"></script>
+</body>
+</html> 
