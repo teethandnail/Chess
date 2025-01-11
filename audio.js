@@ -4,6 +4,7 @@ const audioManager = {
     redWinSound: new Audio('sounds/redwin.mp3'),
     blackWinSound: new Audio('sounds/blackwin.mp3'),
     checkSound: new Audio('sounds/check.mp3'),
+    incheckSound: new Audio('sounds/incheck.mp3'),
 
     // 播放移动音效
     playMoveSound() {
@@ -27,7 +28,13 @@ const audioManager = {
     playCheckSound() {
         this.checkSound.currentTime = 0;
         this.checkSound.play().catch(error => console.log('将军音效失败:', error));
-    }
+    },
+
+    // 播放被将军音效
+    playIncheckSound() {
+        this.incheckSound.currentTime = 0;
+        this.incheckSound.play().catch(error => console.log('被将军音效失败:', error));
+    },
 };
 
 // 导出音频管理器

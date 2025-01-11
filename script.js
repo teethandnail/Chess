@@ -290,7 +290,7 @@ function isValidMove(piece, fromPos, toPos) {
     const fromCol = fromPos.charAt(2).charCodeAt(0) - 'a'.charCodeAt(0);
     const toRow = parseInt(toPos.charAt(1));
     const toCol = toPos.charAt(2).charCodeAt(0) - 'a'.charCodeAt(0);
-    console.log("检查",piece.type, "的移动是否合法:", "from [行, 列]:", fromRow, fromCol, "to:", toRow, toCol);
+    // console.log("检查",piece.type, "的移动是否合法:", "from [行, 列]:", fromRow, fromCol, "to:", toRow, toCol);
 
     // 根据不同棋子类型检查移动规则
     switch (piece.type) {
@@ -330,7 +330,7 @@ function showMessage(message) {
 
 // 车的移动规则
 function checkRookMove(fromRow, fromCol, toRow, toCol) {
-    console.log('Checking rook move from [行, 列]:', fromRow, fromCol, 'to [行, 列]:', toRow, toCol);
+    // console.log('Checking 车 move from [行, 列]:', fromRow, fromCol, 'to [行, 列]:', toRow, toCol);
 
     if (fromRow !== toRow && fromCol !== toCol) {
         showMessage('车只能直线移动！');
@@ -468,9 +468,7 @@ function checkKingMove(color, fromRow, fromCol, toRow, toCol) {
 
 // 炮的移动规则
 function checkCannonMove(fromRow, fromCol, toRow, toCol) {
-    console.log('=== 检查炮的移动 ===');
-    console.log('从位置:', fromRow, fromCol);
-    console.log('到位置:', toRow, toCol);
+    console.log('=== 检查炮的移动 ===', fromRow, fromCol, "到", toRow, toCol);
 
     if (fromRow !== toRow && fromCol !== toCol) {
         showMessage('炮只能直线移动！');
@@ -501,7 +499,7 @@ function checkCannonMove(fromRow, fromCol, toRow, toCol) {
         }
     }
     
-    console.log('目标位置棋子:', targetPiece);
+    console.log('目标位置棋子:', targetPiece ? targetPiece : '空');
     console.log('中间棋子数量:', pieceCount);
     
     // 吃子时必须隔一个棋子
@@ -637,24 +635,75 @@ function checkCheck(piece) {
         return false;
     }
     
-    // 检查当前棋子是否能移动到对方主帅的位置
-    return isValidMove(piece, piece.position, targetKing.position);
+    // 获取移动方所有的棋子
+    const attackingPieces = initialPieces.filter(p => p.color === piece.color);
+    
+    // 检查每个棋子是否可以攻击到对方主帅
+    for (const attackingPiece of attackingPieces) {
+        // 如果是炮,需要特殊处理跳吃规则
+        if (attackingPiece.type === '炮' || attackingPiece.type === '砲') {
+            if (checkCannonAttackKing(attackingPiece, targetKing)) {
+                return true;
+            }
+            continue;
+        }
+        
+        // 其他棋子检查是否可以直接移动到主帅位置
+        if (isValidMove(attackingPiece, attackingPiece.position, targetKing.position)) {
+            return true;
+        }
+    }
+    
+    return false;
+}
+
+// 检查炮是否可以攻击到对方主帅
+function checkCannonAttackKing(cannon, targetKing) {
+    const fromRow = parseInt(cannon.position.charAt(1));
+    const fromCol = cannon.position.charAt(2).charCodeAt(0) - 'a'.charCodeAt(0);
+    const toRow = parseInt(targetKing.position.charAt(1));
+    const toCol = targetKing.position.charAt(2).charCodeAt(0) - 'a'.charCodeAt(0);
+    
+    // 必须在同一直线上
+    if (fromRow !== toRow && fromCol !== toCol) {
+        return false;
+    }
+    
+    let pieceCount = 0;
+    
+    // 计算路径上的棋子数量
+    if (fromRow === toRow) {
+        const minCol = Math.min(fromCol, toCol);
+        const maxCol = Math.max(fromCol, toCol);
+        for (let col = minCol + 1; col < maxCol; col++) {
+            if (gameState.board[fromRow][col]) {
+                pieceCount++;
+            }
+        }
+    } else {
+        const minRow = Math.min(fromRow, toRow);
+        const maxRow = Math.max(fromRow, toRow);
+        for (let row = minRow + 1; row < maxRow; row++) {
+            if (gameState.board[row][fromCol]) {
+                pieceCount++;
+            }
+        }
+    }
+    
+    // 炮攻击主帅必须正好隔一个棋子
+    return pieceCount === 1;
 }
 
 // 尝试移动棋子
 function tryMovePiece(piece, targetPosition) {
-    console.log('=== 尝试移动棋子 ===');
-    console.log('棋子类型:', piece.type);
-    console.log('棋子颜色:', piece.color);
-    console.log('当前位置:', piece.position);
-    console.log('目标位置:', targetPosition);
-
+    console.log('=== 尝试移动棋子 ===', piece.type, piece.color, "从", piece.position, "到", targetPosition);
+    
     // 获取目标位置的行列
     const targetRow = parseInt(targetPosition.charAt(1));
     const targetCol = targetPosition.charAt(2).charCodeAt(0) - 'a'.charCodeAt(0);
     const targetPiece = gameState.board[targetRow][targetCol];
 
-    console.log('目标位置棋子:', targetPiece);
+    console.log('目标位置棋子:', targetPiece ? targetPiece : '空');
 
     // 只有当目标位置确实有棋子，且是己方棋子时，才禁止移动
     if (targetPiece !== null && targetPiece !== undefined && targetPiece.color === piece.color) {
@@ -736,7 +785,6 @@ function tryMovePiece(piece, targetPosition) {
                 window.audioManager.playMoveSound();
                 
                 console.log('移动完成，新位置:', piece.position);
-                console.log('移动后的棋盘状态：');
                 printBoardState();
                 
                 // 记录这一步移动的棋子
@@ -750,6 +798,13 @@ function tryMovePiece(piece, targetPosition) {
                 if (checkCheck(piece)) {
                     showMessage('将军！');
                     window.audioManager.playCheckSound();
+                }
+                
+                // 检查移动后是否被对方将军
+                if (isInCheck(gameState.currentPlayer)) {
+                    // 撤销这步移动
+                    showMessage('这步棋会被将军！');
+                    window.audioManager.playIncheckSound();
                 }
                 
                 // 取消选中状态
@@ -902,6 +957,38 @@ function undoLastMove() {
     // 更新游戏状态
     updateGameState();
     updateGameStatus();
+}
+
+// 新增函数：检查指定颜色方是否被将军
+function isInCheck(color) {
+    // 获取己方主帅
+    const kingType = color === 'red' ? '帅' : '将';
+    const king = initialPieces.find(p => p.type === kingType && p.color === color);
+    
+    if (!king) {
+        return false;
+    }
+    
+    // 获取对方所有棋子
+    const opponentPieces = initialPieces.filter(p => p.color !== color);
+    
+    // 检查每个对方棋子是否可以攻击到己方主帅
+    for (const attackingPiece of opponentPieces) {
+        // 如果是炮，需要特殊处理跳吃规则
+        if (attackingPiece.type === '炮' || attackingPiece.type === '砲') {
+            if (checkCannonAttackKing(attackingPiece, king)) {
+                return true;
+            }
+            continue;
+        }
+        
+        // 其他棋子检查是否可以直接移动到主帅位置
+        if (isValidMove(attackingPiece, attackingPiece.position, king.position)) {
+            return true;
+        }
+    }
+    
+    return false;
 }
 
 // 页面加载完成后初始化
