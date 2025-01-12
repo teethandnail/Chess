@@ -56,6 +56,162 @@ let undoButton;
 let currentPlayerDisplay;
 let gameMessageDisplay;
 
+// AI相关变量
+let searchEngine = null;
+let aiBoard = null;
+
+// AI难度设置
+let AI_LEVEL = {
+    EASY: { hashLevel: 1, millis: 100 },
+    MEDIUM: { hashLevel: 5, millis: 300 },
+    HARD: { hashLevel: 16, millis: 1000 }
+};
+
+let currentAILevel = AI_LEVEL.MEDIUM;
+
+// 设置AI难度
+function setAILevel(level) {
+    currentAILevel = AI_LEVEL[level];
+    if (aiBoard) {
+        aiBoard.setSearch(currentAILevel.hashLevel);
+        aiBoard.millis = currentAILevel.millis;
+    }
+}
+
+// 初始化AI
+function initializeAI() {
+    // 创建AI棋盘对象
+    aiBoard = new Board(document.createElement('div'), './core/images/', './core/sounds/');
+    // 设置搜索引擎
+    // aiBoard.setSearch(currentAILevel.hashLevel);
+    aiBoard.millis = currentAILevel.millis;
+    aiBoard.setSearch(3);
+    aiBoard.millis = 10;
+    aiBoard.computer = 1;
+    searchEngine = aiBoard.search;
+    
+    // 设置初始局面
+    const startupFen = "rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR w";
+    aiBoard.pos.fromFen(startupFen);
+}
+
+// 将我们的坐标格式转换为AI使用的格式
+function convertToAIPosition(position) {
+    // 只取position的后两位，忽略颜色标识
+    // 例如：'r9a' 或 'b9a' 都只取 '9a'
+    const coord = position.slice(-2);
+    // 检查输入格式
+    if (typeof coord !== 'string' || coord.length !== 2) {
+        return -1;
+    }
+    
+    // 获取纵坐标（0-9）
+    const row = parseInt(coord[0]);
+    // 获取横坐标（a-i转换为0-8）
+    const col = coord.charCodeAt(1) - 'a'.charCodeAt(0);
+    
+    // 检查坐标是否有效
+    if (col < 0 || col > 8 || row < 0 || row > 9) {
+        return -1;
+    }
+    
+    // 转换为sq_坐标
+    return (row + 3) * 16 + (col + 3);
+}
+
+// 将AI的坐标格式转换为我们的格式
+function convertFromAIPosition(aiPosition) {
+    // 计算行和列
+    const row = Math.floor(aiPosition / 16) - 3;  // 减去偏移量3
+    const col = (aiPosition % 16) - 3;            // 减去偏移量3
+    
+    // 转换为传统坐标格式（数字在前，字母在后）
+    return 'r' + row + String.fromCharCode('a'.charCodeAt(0) + col);
+}
+
+// 更新AI的棋盘状态
+function updateAIBoard() {
+    // 重置AI棋盘
+    aiBoard.pos.clearBoard();
+    
+    // 遍历所有棋子并设置到AI棋盘上
+    initialPieces.forEach(piece => {
+        const aiPos = convertToAIPosition(piece.position);
+        // var testAiPost = ftraditionalToSq(piece.position.slice(1));
+        // console.log("转给ai的pos", aiPos, "testAiPost", testAiPost, "piece.position", piece.position);
+        const pieceType = getPieceType(piece);
+        if (pieceType) {
+            aiBoard.pos.addPiece(aiPos, pieceType);
+        }
+    });
+    
+    // 设置当前行动方
+    aiBoard.pos.sdPlayer = gameState.currentPlayer === 'red' ? 0 : 1;
+    
+    // // 打印调试信息
+    // console.log('当前AI棋盘状态：');
+    // console.log('当前行动方:', gameState.currentPlayer);
+    // console.log('AI行动方:', aiBoard.pos.sdPlayer);
+    // console.log('当前FEN:', aiBoard.pos.toFen());
+    // initialPieces.forEach(piece => {
+    //     const aiPos = convertToAIPosition(piece.position);
+    //     console.log(`${piece.color}${piece.type} at ${piece.position} -> AI pos: 0x${aiPos.toString(16)}`);
+    // });
+}
+
+// 获取AI使用的棋子类型值
+function getPieceType(piece) {
+    const pieceTypes = {
+        red: {
+            '帅': 0x08, '仕': 0x09, '相': 0x0A, '马': 0x0B,
+            '车': 0x0C, '炮': 0x0D, '兵': 0x0E
+        },
+        black: {
+            '将': 0x10, '士': 0x11, '象': 0x12, '馬': 0x13,
+            '車': 0x14, '砲': 0x15, '卒': 0x16
+        }
+    };
+    return pieceTypes[piece.color][piece.type];
+}
+
+// AI移动实现
+async function makeAIMove() {
+    if (!gameState.isGameStarted || gameState.currentPlayer !== 'black') {
+        return;
+    }
+    
+    // 更新AI的棋盘状态
+    updateAIBoard();
+    
+    // 让AI思考下一步
+    if (searchEngine) {
+        aiBoard.thinking = true;
+        try {
+            // 使用searchEngine进行搜索
+            let vl = 0;
+            vl = searchEngine.searchMain(currentAILevel.millis, vl);
+            let mv = searchEngine.mvResult;
+            
+            if (mv) {
+                const srcPos = convertFromAIPosition(SRC(mv));
+                const dstPos = convertFromAIPosition(DST(mv));
+                
+                // 从当前棋盘状态中查找棋子
+                const srcRow = parseInt(srcPos.charAt(1));
+                const srcCol = srcPos.charAt(2).charCodeAt(0) - 'a'.charCodeAt(0);
+                const piece = gameState.board[srcRow][srcCol];
+                
+                if (piece) {
+                    console.log("AI try move piece", piece, "to Pos", dstPos);
+                    tryMovePiece(piece, dstPos);
+                }
+            }
+        } finally {
+            aiBoard.thinking = false;
+        }
+    }
+}
+
 // 坐标转换函数：位置编码转为像素坐标
 function positionToCoordinates(position) {
     // 位置格式：[r|b][0-9][a-i]
@@ -159,8 +315,9 @@ function startGame() {
     gameState.moveHistory = [];
     gameState.lastRemovedPiece = null;
     
-    // 禁用后退按钮
+    // 禁用后退按钮(因为新游戏没有移动历史)
     undoButton.disabled = true;
+    undoButton.style.backgroundColor = ''; // 恢复按钮原始颜色
     
     // 重新初始化棋盘
     initializeBoard();
@@ -333,7 +490,7 @@ function checkRookMove(fromRow, fromCol, toRow, toCol) {
     // console.log('Checking 车 move from [行, 列]:', fromRow, fromCol, 'to [行, 列]:', toRow, toCol);
 
     if (fromRow !== toRow && fromCol !== toCol) {
-        showMessage('车只能直线移动！');
+        // showMessage('车只能直线移动！');
         return false;
     }
     
@@ -343,7 +500,7 @@ function checkRookMove(fromRow, fromCol, toRow, toCol) {
         const maxCol = Math.max(fromCol, toCol);
         for (let col = minCol + 1; col < maxCol; col++) {
             if (gameState.board[fromRow][col]) {
-                showMessage('移动路径上有其他棋子！');
+                // showMessage('移动路径上有其他棋子！');
                 return false;
             }
         }
@@ -352,7 +509,7 @@ function checkRookMove(fromRow, fromCol, toRow, toCol) {
         const maxRow = Math.max(fromRow, toRow);
         for (let row = minRow + 1; row < maxRow; row++) {
             if (gameState.board[row][fromCol]) {
-                showMessage('移动路径上有其他棋子！');
+                // showMessage('移动路径上有其他棋子！');
                 return false;
             }
         }
@@ -366,7 +523,7 @@ function checkKnightMove(fromRow, fromCol, toRow, toCol) {
     const colDiff = Math.abs(toCol - fromCol);
     
     if (!((rowDiff === 2 && colDiff === 1) || (rowDiff === 1 && colDiff === 2))) {
-        showMessage('马只能走"日"字！');
+        // showMessage('马只能走"日"字！');
         return false;
     }
     
@@ -374,13 +531,13 @@ function checkKnightMove(fromRow, fromCol, toRow, toCol) {
     if (rowDiff === 2) {
         const checkRow = fromRow + (toRow > fromRow ? 1 : -1);
         if (gameState.board[checkRow][fromCol]) {
-            showMessage('马脚被蹩住了！');
+            // showMessage('马脚被蹩住了！');
             return false;
         }
     } else {
         const checkCol = fromCol + (toCol > fromCol ? 1 : -1);
         if (gameState.board[fromRow][checkCol]) {
-            showMessage('马脚被蹩住了！');
+            // showMessage('马脚被蹩住了！');
             return false;
         }
     }
@@ -393,7 +550,7 @@ function checkElephantMove(color, fromRow, fromCol, toRow, toCol) {
     const colDiff = Math.abs(toCol - fromCol);
     
     if (rowDiff !== 2 || colDiff !== 2) {
-        showMessage('相/象只能走"田"字！');
+        // showMessage('相/象只能走"田"字！');
         return false;
     }
     
@@ -401,13 +558,13 @@ function checkElephantMove(color, fromRow, fromCol, toRow, toCol) {
     const centerRow = (fromRow + toRow) / 2;
     const centerCol = (fromCol + toCol) / 2;
     if (gameState.board[centerRow][centerCol]) {
-        showMessage('相心被蹩住了！');
+        // showMessage('相心被蹩住了！');
         return false;
     }
     
     // 不能过河
     if (color === 'red' && toRow < 5 || color === 'black' && toRow > 4) {
-        showMessage('相/象不能过河！');
+        // showMessage('相/象不能过河！');
         return false;
     }
     
@@ -420,19 +577,19 @@ function checkAdvisorMove(color, fromRow, fromCol, toRow, toCol) {
     const colDiff = Math.abs(toCol - fromCol);
     
     if (rowDiff !== 1 || colDiff !== 1) {
-        showMessage('仕/士只能斜走一格！');
+        // showMessage('仕/士只能斜走一格！');
         return false;
     }
     
     // 检查是否在九宫格内
     if (color === 'red') {
         if (toRow < 7 || toRow > 9 || toCol < 3 || toCol > 5) {
-            showMessage('仕/士必须在九宫格内！');
+            // showMessage('仕/士必须在九宫格内！');
             return false;
         }
     } else {
         if (toRow > 2 || toRow < 0 || toCol < 3 || toCol > 5) {
-            showMessage('仕/士必须在九宫格内！');
+            // showMessage('仕/士必须在九宫格内！');
             return false;
         }
     }
@@ -446,19 +603,19 @@ function checkKingMove(color, fromRow, fromCol, toRow, toCol) {
     const colDiff = Math.abs(toCol - fromCol);
     
     if (rowDiff + colDiff !== 1) {
-        showMessage('帅/将只能走一格！');
+        // showMessage('帅/将只能走一格！');
         return false;
     }
     
     // 检查是否在九宫格内
     if (color === 'red') {
         if (toRow < 7 || toRow > 9 || toCol < 3 || toCol > 5) {
-            showMessage('帅/将必须在九宫格内！');
+            // showMessage('帅/将必须在九宫格内！');
             return false;
         }
     } else {
         if (toRow > 2 || toRow < 0 || toCol < 3 || toCol > 5) {
-            showMessage('帅/将必须在九宫格内！');
+            // showMessage('帅/将必须在九宫格内！');
             return false;
         }
     }
@@ -468,10 +625,8 @@ function checkKingMove(color, fromRow, fromCol, toRow, toCol) {
 
 // 炮的移动规则
 function checkCannonMove(fromRow, fromCol, toRow, toCol) {
-    console.log('=== 检查炮的移动 ===', fromRow, fromCol, "到", toRow, toCol);
-
     if (fromRow !== toRow && fromCol !== toCol) {
-        showMessage('炮只能直线移动！');
+        // showMessage('炮只能直线移动！');
         return false;
     }
     
@@ -485,7 +640,6 @@ function checkCannonMove(fromRow, fromCol, toRow, toCol) {
         for (let col = minCol + 1; col < maxCol; col++) {
             if (gameState.board[fromRow][col]) {
                 pieceCount++;
-                console.log('发现中间棋子，位置:', fromRow, col);
             }
         }
     } else {
@@ -494,24 +648,20 @@ function checkCannonMove(fromRow, fromCol, toRow, toCol) {
         for (let row = minRow + 1; row < maxRow; row++) {
             if (gameState.board[row][fromCol]) {
                 pieceCount++;
-                console.log('发现中间棋子，位置:', row, fromCol);
             }
         }
     }
     
-    console.log('目标位置棋子:', targetPiece ? targetPiece : '空');
-    console.log('中间棋子数量:', pieceCount);
-    
     // 吃子时必须隔一个棋子
     if (targetPiece) {
         if (pieceCount !== 1) {
-            showMessage('炮吃子必须隔一个棋子！');
+            // showMessage('炮吃子必须隔一个棋子！');
             return false;
         }
     } else {
         // 移动时路径上不能有棋子
         if (pieceCount !== 0) {
-            showMessage('炮移动路径上不能有棋子！');
+            // showMessage('炮移动路径上不能有棋子！');
             return false;
         }
     }
@@ -529,13 +679,13 @@ function checkPawnMove(color, fromRow, fromCol, toRow, toCol) {
         if (fromRow > 4) {
             // 未过河
             if (rowDiff !== -1 || colDiff !== 0) {
-                showMessage('未过河的兵只能向前走！');
+                // showMessage('未过河的兵只能向前走！');
                 return false;
             }
         } else {
             // 已过河
             if (rowDiff > 0 || (rowDiff === 0 && colDiff > 1) || Math.abs(rowDiff) + colDiff > 1) {
-                showMessage('过河的兵只能向前或左右走一步！');
+                // showMessage('过河的兵只能向前或左右走一步！');
                 return false;
             }
         }
@@ -544,13 +694,13 @@ function checkPawnMove(color, fromRow, fromCol, toRow, toCol) {
         if (fromRow < 5) {
             // 未过河
             if (rowDiff !== 1 || colDiff !== 0) {
-                showMessage('未过河的卒只能向前走！');
+                // showMessage('未过河的卒只能向前走！');
                 return false;
             }
         } else {
             // 已过河
             if (rowDiff < 0 || (rowDiff === 0 && colDiff > 1) || Math.abs(rowDiff) + colDiff > 1) {
-                showMessage('过河的卒只能向前或左右走一步！');
+                // showMessage('过河的卒只能向前或左右走一步！');
                 return false;
             }
         }
@@ -713,7 +863,18 @@ function tryMovePiece(piece, targetPosition) {
 
     if (isValidMove(piece, piece.position, targetPosition)) {
         console.log('移动合法，准备执行移动');
-        
+
+        // 移动是否会导致被将军
+        const inCheck = withTemporaryMove(piece, targetPosition, () => {
+            return isInCheck(gameState.currentPlayer);
+        });
+
+        if (inCheck) {
+            showMessage('将军中！');
+            window.audioManager.playCheckingSound();
+            return false;
+        }
+
         const fromPosition = piece.position;
         let removedPiece = null;
         
@@ -756,6 +917,8 @@ function tryMovePiece(piece, targetPosition) {
                 gameMessageDisplay.textContent = `游戏结束！${winner}获胜！`;
                 gameState.isGameStarted = false;
                 startButton.disabled = false; // 允许重新开始游戏
+                undoButton.disabled = true;   // 禁用返回上一步按钮
+                undoButton.style.backgroundColor = '#ccc'; // 设置按钮为灰色
                 
                 // 记录这一步移动
                 recordMove(piece, fromPosition, targetPosition, removedPiece);
@@ -796,8 +959,22 @@ function tryMovePiece(piece, targetPosition) {
                 
                 // 检查是否将军
                 if (checkCheck(piece)) {
-                    showMessage('将军！');
-                    window.audioManager.playCheckSound();
+                    // 检查是否将死
+                    if (isCheckmate(gameState.currentPlayer === 'red' ? 'black' : 'red')) {
+                        showMessage('将死！你赢了！');
+                        gameState.isGameStarted = false;
+                        startButton.disabled = false;
+
+                        // 播放游戏结束音效
+                        if (piece.color === 'red') {
+                            window.audioManager.playRedWinSound();
+                        } else {
+                            window.audioManager.playBlackWinSound();
+                        }
+                    } else {
+                        showMessage('将军！');
+                        window.audioManager.playCheckSound();
+                    }
                 }
                 
                 // 检查移动后是否被对方将军
@@ -814,10 +991,10 @@ function tryMovePiece(piece, targetPosition) {
                 gameState.currentPlayer = piece.color === 'red' ? 'black' : 'red';
                 updateGameStatus();
                 
-                // // 如果切换到黑方回合，让AI下棋
-                // if (gameState.currentPlayer === 'black') {
-                //     setTimeout(makeAIMove, 1000); // 延迟1秒，让玩家能看清楚红方的移动
-                // }
+                // 如果切换到黑方回合，让AI下棋
+                if (gameState.currentPlayer === 'black') {
+                    setTimeout(makeAIMove, 500); // 延迟500ms，让玩家能看清楚红方的移动
+                }
             }, 0);
         });
         
@@ -826,6 +1003,32 @@ function tryMovePiece(piece, targetPosition) {
     }
     console.log('移动不合法');
     return false;
+}
+
+// 临时移动棋子并执行操作的通用方法
+function withTemporaryMove(piece, targetPosition, operation) {
+    // 保存当前状态
+    const fromRow = parseInt(piece.position.charAt(1));
+    const fromCol = piece.position.charAt(2).charCodeAt(0) - 'a'.charCodeAt(0);
+    const originalPosition = piece.position;
+    const targetRow = parseInt(targetPosition.charAt(1));
+    const targetCol = targetPosition.charAt(2).charCodeAt(0) - 'a'.charCodeAt(0);
+    const originalTargetPiece = gameState.board[targetRow][targetCol];
+
+    // 临时移动棋子
+    gameState.board[fromRow][fromCol] = null;
+    piece.position = targetPosition;
+    gameState.board[targetRow][targetCol] = piece;
+
+    // 执行传入的操作
+    const result = operation();
+
+    // 恢复原状态
+    piece.position = originalPosition;
+    gameState.board[fromRow][fromCol] = piece;
+    gameState.board[targetRow][targetCol] = originalTargetPiece;
+
+    return result;
 }
 
 // 更新棋盘状态
@@ -844,26 +1047,44 @@ function updateGameState() {
     });
 }
 
-// AI移动
-async function makeAIMove() {
-    if (!gameState.isGameStarted || gameState.currentPlayer !== 'black') {
-        console.log('AI移动失败，游戏未开始或不是黑方回合');
-        return;
+// 新增函数：检查指定颜色方是否被将军
+function isInCheck(color) {
+    // 获取己方主帅
+    const kingType = color === 'red' ? '帅' : '将';
+    const king = initialPieces.find(p => p.type === kingType && p.color === color);
+    
+    if (!king) {
+        return false;
     }
     
-    // 使用ai.js中实现的AI逻辑
-    await window.makeAIMove();
-}
-
-// 移动棋子
-function movePiece(piece, newPosition) {
-    const coords = positionToCoordinates(newPosition);
-    piece.position = newPosition;
-    piece.element.style.left = coords.x + 'px';
-    piece.element.style.top = coords.y + 'px';
+    // 获取对方所有棋子
+    const opponentPieces = [];
+    for (let row = 0; row < 10; row++) {
+        for (let col = 0; col < 9; col++) {
+            const piece = gameState.board[row][col];
+            if (piece && piece.color !== color) {
+                opponentPieces.push(piece);
+            }
+        }
+    }
     
-    // 更新棋盘状态
-    updateGameState();
+    // 检查每个对方棋子是否可以攻击到己方主帅
+    for (const attackingPiece of opponentPieces) {
+        // 如果是炮，需要特殊处理跳吃规则
+        if (attackingPiece.type === '炮' || attackingPiece.type === '砲') {
+            if (checkCannonAttackKing(attackingPiece, king)) {
+                return true;
+            }
+            continue;
+        }
+        
+        // 其他棋子检查是否可以直接移动到主帅位置
+        if (isValidMove(attackingPiece, attackingPiece.position, king.position)) {
+            return true;
+        }
+    }
+    
+    return false;
 }
 
 // 打印棋盘状态
@@ -959,40 +1180,74 @@ function undoLastMove() {
     updateGameStatus();
 }
 
-// 新增函数：检查指定颜色方是否被将军
-function isInCheck(color) {
-    // 获取己方主帅
-    const kingType = color === 'red' ? '帅' : '将';
-    const king = initialPieces.find(p => p.type === kingType && p.color === color);
-    
-    if (!king) {
-        return false;
-    }
-    
-    // 获取对方所有棋子
-    const opponentPieces = initialPieces.filter(p => p.color !== color);
-    
-    // 检查每个对方棋子是否可以攻击到己方主帅
-    for (const attackingPiece of opponentPieces) {
-        // 如果是炮，需要特殊处理跳吃规则
-        if (attackingPiece.type === '炮' || attackingPiece.type === '砲') {
-            if (checkCannonAttackKing(attackingPiece, king)) {
-                return true;
+
+// 新增函数：检查color方是否将死
+function isCheckmate(color) {
+    // 从当前棋盘状态获取所有己方棋子
+    const ownPieces = [];
+    for (let row = 0; row < 10; row++) {
+        for (let col = 0; col < 9; col++) {
+            const piece = gameState.board[row][col];
+            if (piece && piece.color === color) {
+                ownPieces.push(piece);
             }
-            continue;
-        }
-        
-        // 其他棋子检查是否可以直接移动到主帅位置
-        if (isValidMove(attackingPiece, attackingPiece.position, king.position)) {
-            return true;
         }
     }
     
-    return false;
+    // 遍历每个己方棋子
+    for (const piece of ownPieces) {
+        const fromRow = parseInt(piece.position.charAt(1));
+        const fromCol = piece.position.charAt(2).charCodeAt(0) - 'a'.charCodeAt(0);
+        
+        // 遍历棋盘上的每个位置
+        for (let row = 0; row < 10; row++) {
+            for (let col = 0; col < 9; col++) {
+                // 检查目标位置是否已经有己方棋子
+                const targetPiece = gameState.board[row][col];
+                if (targetPiece && targetPiece.color === color) {
+                    continue; // 如果目标位置有己方棋子，跳过这个位置
+                }
+
+                const targetColor = row >= 5 ? 'r' : 'b';
+                const targetPosition = `${targetColor}${row}${String.fromCharCode('a'.charCodeAt(0) + col)}`;
+                
+                // 如果这步移动合法
+                if (isValidMove(piece, piece.position, targetPosition)) {
+                    // 保存当前状态
+                    const originalPosition = piece.position;
+                    
+                    // 临时移动棋子
+                    gameState.board[fromRow][fromCol] = null;
+                    piece.position = targetPosition;
+                    gameState.board[row][col] = piece;
+                    
+                    // 检查移动后是否仍然被将军
+                    const stillInCheck = isInCheck(color);
+                    
+                    // 恢复原状态
+                    piece.position = originalPosition;
+                    gameState.board[fromRow][fromCol] = piece;
+                    gameState.board[row][col] = targetPiece; // 这里targetPiece可能是null，这是正确的
+                    
+                    // 如果找到一步可以解救的移动，说明没有将死
+                    if (!stillInCheck) {
+                        return false;
+                    }
+                }
+            }
+        }
+    }
+    
+    // 如果所有可能的移动都无法解救将军，说明已经将死
+    return true;
 }
 
 // 页面加载完成后初始化
 document.addEventListener('DOMContentLoaded', () => {
     initializeBoard();
     initializeGameControls();
+    initializeAI();
+    
+    // 自动开始游戏
+    startGame();
 }); 

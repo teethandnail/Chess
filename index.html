@@ -20,11 +20,23 @@
                 <p id="currentPlayer">等待开始...</p>
                 <p id="gameMessage"></p>
                 <button id="undoButton" class="undo-button" disabled>后退一步</button>
+                <div class="ai-control">
+                    <h3>AI难度</h3>
+                    <select id="aiLevel" onchange="setAILevel(this.value)">
+                        <option value="EASY">入门</option>
+                        <option value="MEDIUM" selected>普通</option>
+                        <option value="HARD">困难</option>
+                    </select>
+                </div>
             </div>
         </div>
     </div>
     <script src="script.js"></script>
-    <!-- <script src="ai.js"></script> -->
     <script src="audio.js"></script>
+    <!-- AI相关文件 -->
+    <script src="core/position.js"></script>
+    <script src="core/board.js"></script>
+    <script src="core/search.js"></script>
+    <script src="core/book.js"></script>
 </body>
 </html> 
