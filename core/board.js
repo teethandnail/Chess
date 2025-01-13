@@ -129,19 +129,19 @@ function Board(container, images, sounds) {
   }
 
   // 初始化思考动画
-  this.thinking = document.createElement("img");
-  this.thinking.src = images + "thinking.gif";
-  style = this.thinking.style;
-  style.visibility = "hidden";
-  style.position = "absolute";
-  style.left = THINKING_LEFT + "px";
-  style.top = THINKING_TOP + "px";
-  container.appendChild(this.thinking);
+  // this.thinking = document.createElement("img");
+  // this.thinking.src = images + "thinking.gif";
+  // style = this.thinking.style;
+  // style.visibility = "hidden";
+  // style.position = "absolute";
+  // style.left = THINKING_LEFT + "px";
+  // style.top = THINKING_TOP + "px";
+  // container.appendChild(this.thinking);
 
-  // 初始化音效播放器
-  this.dummy = document.createElement("div");
-  this.dummy.style.position = "absolute";
-  container.appendChild(this.dummy);
+  // // 初始化音效播放器
+  // this.dummy = document.createElement("div");
+  // this.dummy.style.position = "absolute";
+  // container.appendChild(this.dummy);
 
   // 刷新棋盘显示
   this.flushBoard();
@@ -408,9 +408,9 @@ Board.prototype.clickSquare = function(sq_) {
 // sq: 棋盘格位置
 // selected: 是否被选中
 Board.prototype.drawSquare = function(sq, selected) {
-  var img = this.imgSquares[this.flipped(sq)];
-  img.src = this.images + PIECE_NAME[this.pos.squares[sq]] + ".gif";
-  img.style.backgroundImage = selected ? "url(" + this.images + "oos.gif)" : "";
+  // var img = this.imgSquares[this.flipped(sq)];
+  // img.src = this.images + PIECE_NAME[this.pos.squares[sq]] + ".gif";
+  // img.style.backgroundImage = selected ? "url(" + this.images + "oos.gif)" : "";
 }
 
 // 刷新整个棋盘显示

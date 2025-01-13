@@ -2,7 +2,9 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
     <title>中国象棋</title>
     <link rel="stylesheet" href="style.css">
 </head>
@@ -13,24 +15,27 @@
             <div class="river"></div>
             <div id="pieces"></div>
         </div>
-        <div class="game-info">
-            <button id="startButton" class="start-button">开始游戏</button>
+        <div class="controls">
+            <div class="button-group">
+                <button id="aiSettingButton" class="control-button">AI难度</button>
+                <button id="startButton" class="control-button">开始游戏</button>
+                <button id="undoButton" class="control-button" disabled>后退一步</button>
+            </div>
+            <div class="ai-level-dropdown" style="display: none;">
+                <select id="aiLevel" onchange="setAILevel(this.value)">
+                    <option value="EASY">入门</option>
+                    <option value="MEDIUM" selected>普通</option>
+                    <option value="HARD">困难</option>
+                </select>
+            </div>
             <div class="game-status">
-                <h3>游戏状态</h3>
-                <p id="currentPlayer">等待开始...</p>
+                <p id="currentPlayer">当前回合：红方</p>
                 <p id="gameMessage"></p>
-                <button id="undoButton" class="undo-button" disabled>后退一步</button>
-                <div class="ai-control">
-                    <h3>AI难度</h3>
-                    <select id="aiLevel" onchange="setAILevel(this.value)">
-                        <option value="EASY">入门</option>
-                        <option value="MEDIUM" selected>普通</option>
-                        <option value="HARD">困难</option>
-                    </select>
-                </div>
             </div>
         </div>
     </div>
+    <!-- 移动规则模块 -->
+    <script src="moveRules.js"></script>
     <script src="script.js"></script>
     <script src="audio.js"></script>
     <!-- AI相关文件 -->
