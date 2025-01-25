@@ -505,7 +505,7 @@ function handleBoardClick(event) {
     
     // 考虑页面缩放比例
     const scale = window.innerWidth <= 380 ? 0.7 : 
-                 window.innerWidth <= 480 ? 0.8 : 1;
+                 window.innerWidth <= 480 ? 0.8 : 1.2;
                  
     // 计算相对坐标时考虑缩放
     const x = (clientX - boardRect.left) / scale - 25;
