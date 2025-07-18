@@ -8,7 +8,8 @@ let gameState = {
     lastMovedRedPiece: null,  // 记录红方上一次移动的棋子
     lastMovedBlackPiece: null, // 记录黑方上一次移动的棋子
     moveHistory: [], // 记录移动历史
-    lastRemovedPiece: null // 记录最后一次被吃掉的棋子
+    lastRemovedPiece: null, // 记录最后一次被吃掉的棋子
+    aiMoveTimer: null // AI移动定时器
 };
 
 // 初始化棋子位置
@@ -168,7 +169,7 @@ function getPieceType(piece) {
 }
 
 // AI移动实现
-async function makeAIMove() {
+function makeAIMove() {
     if (!gameState.isGameStarted || gameState.currentPlayer !== 'black') {
         return;
     }
@@ -199,6 +200,8 @@ async function makeAIMove() {
                     tryMovePiece(piece, dstPos);
                 }
             }
+        } catch (error) {
+            console.error('AI移动出错:', error);
         } finally {
             aiBoard.thinking = false;
         }
@@ -254,6 +257,12 @@ function initializeGameControls() {
 
 // 开始游戏
 function startGame() {
+    
+    // 清理之前的定时器
+    if (gameState.aiMoveTimer) {
+        clearTimeout(gameState.aiMoveTimer);
+        gameState.aiMoveTimer = null;
+    }
     
     // 重置游戏状态
     gameState.isGameStarted = true;
@@ -766,8 +775,12 @@ function tryMovePiece(piece, targetPosition) {
         updateGameStatus();
         
         if (gameState.currentPlayer === 'black') {
+            // 清理之前的定时器
+            if (gameState.aiMoveTimer) {
+                clearTimeout(gameState.aiMoveTimer);
+            }
             // 等待一段时间后再让AI移动，确保用户能看清楚移动结果
-            setTimeout(makeAIMove, 700);
+            gameState.aiMoveTimer = setTimeout(makeAIMove, 700);
         }
         
         return true;
@@ -974,10 +987,12 @@ function undoLastMove() {
 
     // 更新最后移动的棋子记录
     if (piece.color === 'red') {
-        const previousMove = gameState.moveHistory.findLast(move => move.piece.color === 'red');
+        const redMoves = gameState.moveHistory.filter(move => move.piece.color === 'red');
+        const previousMove = redMoves.length > 0 ? redMoves[redMoves.length - 1] : null;
         gameState.lastMovedRedPiece = previousMove ? previousMove.piece : null;
     } else {
-        const previousMove = gameState.moveHistory.findLast(move => move.piece.color === 'black');
+        const blackMoves = gameState.moveHistory.filter(move => move.piece.color === 'black');
+        const previousMove = blackMoves.length > 0 ? blackMoves[blackMoves.length - 1] : null;
         gameState.lastMovedBlackPiece = previousMove ? previousMove.piece : null;
     }
 
@@ -1092,6 +1107,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // 游戏结束时的处理
 function endGame(winner) {
+    // 清理定时器
+    if (gameState.aiMoveTimer) {
+        clearTimeout(gameState.aiMoveTimer);
+        gameState.aiMoveTimer = null;
+    }
+    
     gameState.isGameStarted = false;
     startButton.disabled = false;
     undoButton.disabled = true;
