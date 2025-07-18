@@ -1,8 +1,6 @@
 // 音频管理器
 window.audioManager = {
-    moveSound: new Howl({
-        src: ['sounds/move.mp3']
-      }),
+    moveSound: null,
     checkSound: './sounds/check.mp3',
     checkingSound: './sounds/checking.mp3',
     incheckSound: './sounds/incheck.mp3',
@@ -12,30 +10,48 @@ window.audioManager = {
     // 音频实例池
     audioPool: {},
     
+    // 初始化状态
+    initialized: false,
+    
     // 初始化音频池
     initAudioPool() {
-        // 为每种音效预先创建音频实例
-        this.audioPool.check = new Audio(this.checkSound);
-        this.audioPool.checking = new Audio(this.checkingSound);
-        this.audioPool.incheck = new Audio(this.incheckSound);
-        this.audioPool.redWin = new Audio(this.redWinSound);
-        this.audioPool.blackWin = new Audio(this.blackWinSound);
+        if (this.initialized) {
+            return Promise.resolve();
+        }
+        
+        try {
+            // 初始化移动音效
+            this.moveSound = new Howl({
+                src: ['sounds/move.mp3']
+            });
+            
+            // 为每种音效预先创建音频实例
+            this.audioPool.check = new Audio(this.checkSound);
+            this.audioPool.checking = new Audio(this.checkingSound);
+            this.audioPool.incheck = new Audio(this.incheckSound);
+            this.audioPool.redWin = new Audio(this.redWinSound);
+            this.audioPool.blackWin = new Audio(this.blackWinSound);
 
-        // 在iOS上预加载
-        const playPromises = Object.values(this.audioPool).map(audio => {
-            audio.preload = 'auto';
-            audio.load();
-            // iOS要求必须有用户交互才能播放
-            const playAttempt = audio.play();
-            if (playAttempt) {
-                playAttempt.catch(() => {});
-            }
-            audio.pause();
-            audio.currentTime = 0;
-            return audio;
-        });
+            // 在iOS上预加载
+            const playPromises = Object.values(this.audioPool).map(audio => {
+                audio.preload = 'auto';
+                audio.load();
+                // iOS要求必须有用户交互才能播放
+                const playAttempt = audio.play();
+                if (playAttempt) {
+                    playAttempt.catch(() => {});
+                }
+                audio.pause();
+                audio.currentTime = 0;
+                return audio;
+            });
 
-        return Promise.all(playPromises).catch(() => {});
+            this.initialized = true;
+            return Promise.all(playPromises).catch(() => {});
+        } catch (error) {
+            console.error('音频初始化失败:', error);
+            return Promise.resolve();
+        }
     },
 
     playSound(type) {
@@ -57,7 +73,9 @@ window.audioManager = {
     },
 
     playMoveSound() {
-        this.moveSound.play();
+        if (this.moveSound) {
+            this.moveSound.play();
+        }
     },
 
     playCheckSound() {
@@ -83,5 +101,10 @@ window.audioManager = {
 
 // 页面加载完成后初始化音频池
 document.addEventListener('DOMContentLoaded', () => {
-    window.audioManager.initAudioPool();
+    // 延迟初始化音频，确保audioManager完全加载
+    setTimeout(() => {
+        if (window.audioManager) {
+            window.audioManager.initAudioPool();
+        }
+    }, 100);
 }); 
